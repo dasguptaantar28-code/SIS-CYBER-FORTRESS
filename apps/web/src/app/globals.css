@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sis-bg: #050b18;
+  --sis-bg-secondary: #0b1730;
+  --sis-card: #10213f;
+  --sis-primary: #087bff;
+  --sis-cyan: #00d4ff;
+  --sis-success: #00d69a;
+  --sis-warning: #ffb547;
+  --sis-danger: #ff4560;
+  --sis-text: #f3f7ff;
+  --sis-muted: #96a8c5;
+}
+
+html,
+body {
+  background-color: var(--sis-bg);
+  color: var(--sis-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sis-glass {
+  background: linear-gradient(145deg, rgba(16, 33, 63, 0.88), rgba(11, 23, 48, 0.92));
+  border: 1px solid rgba(56, 114, 207, 0.25);
+  backdrop-filter: blur(12px);
+}
+
+.sis-glass-hover:hover {
+  border-color: rgba(0, 212, 255, 0.48);
+  box-shadow: 0 0 24px rgba(0, 212, 255, 0.12);
+}
+
+.sis-hero-bg {
+  background:
+    radial-gradient(circle at 82% 20%, rgba(0, 212, 255, 0.18), transparent 48%),
+    radial-gradient(circle at 18% 85%, rgba(8, 123, 255, 0.16), transparent 50%),
+    linear-gradient(135deg, #0b1730 0%, #0e1e3c 60%, #071226 100%);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050b18;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1b335e;
+  border-radius: 9999px;
+}

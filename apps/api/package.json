@@ -1,0 +1,76 @@
+{
+  "name": "@sis/api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SIS Cyber Fortress Backend REST & WebSocket API (NestJS + Prisma + PostgreSQL)",
+  "scripts": {
+    "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "node dist/src/main.js",
+    "start:dev": "nest start --watch",
+    "start:local-pg": "tsx src/scripts/dev-with-local-pg.ts",
+    "lint": "tsc --noEmit",
+    "test": "jest",
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/platform-socket.io": "^11.1.0",
+    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/throttler": "^6.5.0",
+    "@nestjs/websockets": "^11.1.0",
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "6.19.3",
+    "@sis/shared-contracts": "*",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "cookie-parser": "^1.4.7",
+    "helmet": "^8.1.0",
+    "otpauth": "^9.4.1",
+    "pdfkit": "^0.17.0",
+    "qrcode": "^1.5.4",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "@electric-sql/pglite-socket": "^0.0.19",
+    "@nestjs/cli": "^11.0.7",
+    "@nestjs/testing": "^11.1.0",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/express": "^5.0.1",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.14.0",
+    "@types/pdfkit": "^0.17.2",
+    "@types/qrcode": "^1.5.5",
+    "@types/supertest": "^6.0.3",
+    "jest": "^29.7.0",
+    "prisma": "6.19.3",
+    "supertest": "^7.1.0",
+    "ts-jest": "^29.2.6",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@sis/shared-contracts$": "<rootDir>/../../../packages/shared-contracts/src/index.ts"
+    }
+  }
+}

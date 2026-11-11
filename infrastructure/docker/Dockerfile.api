@@ -1,0 +1,33 @@
+FROM node:22-alpine AS base
+WORKDIR /app
+
+COPY package.json ./
+COPY packages/shared-contracts/package.json packages/shared-contracts/
+COPY apps/api/package.json apps/api/
+
+RUN npm install --workspace=@sis/shared-contracts --workspace=@sis/api
+
+COPY packages/shared-contracts packages/shared-contracts
+COPY apps/api apps/api
+
+RUN npm --workspace=@sis/shared-contracts run build
+RUN npm --workspace=@sis/api run prisma:generate
+RUN npm --workspace=@sis/api run build
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
+
+COPY --from=base /app/node_modules ./node_modules
+COPY --from=base /app/packages/shared-contracts ./packages/shared-contracts
+COPY --from=base /app/apps/api/dist ./apps/api/dist
+COPY --from=base /app/apps/api/prisma ./apps/api/prisma
+COPY --from=base /app/apps/api/package.json ./apps/api/package.json
+
+RUN mkdir -p /app/apps/api/storage/backups && chown -R nestjs:nodejs /app
+USER nestjs
+
+EXPOSE 4000
+CMD ["sh", "-c", "cd apps/api && npx prisma migrate deploy && node dist/src/main.js"]

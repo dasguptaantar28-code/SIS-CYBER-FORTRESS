@@ -1,0 +1,806 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  LOCKED
+  PENDING_VERIFICATION
+}
+
+enum SeverityLevel {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  CONTAINED
+  RESOLVED
+  CLOSED
+}
+
+enum ModuleHealthStatus {
+  HEALTHY
+  DEGRADED
+  OFFLINE
+  UNCONFIGURED
+}
+
+enum AssetOwnershipStatus {
+  PENDING
+  VERIFIED
+  APPROVED
+  REVOKED
+}
+
+enum ScanStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  BLOCKED_BY_POLICY
+}
+
+enum CaseStatus {
+  OPEN
+  ACTIVE
+  UNDER_REVIEW
+  CLOSED
+  ARCHIVED
+}
+
+enum BackupStatus {
+  SCHEDULED
+  IN_PROGRESS
+  VERIFIED_SUCCESS
+  FAILED
+  RESTORED
+}
+
+model Organization {
+  id                  String                @id @default(uuid())
+  name                String
+  slug                String                @unique
+  planTier            String                @default("ENTERPRISE")
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  users               User[]
+  devices             Device[]
+  assets              RegisteredAsset[]
+  moduleStatuses      ModuleStatus[]
+  alerts              SecurityAlert[]
+  incidents           Incident[]
+  threatSources       ThreatSource[]
+  threatIndicators    ThreatIndicator[]
+  scanJobs            ScanJob[]
+  forensicCases       ForensicCase[]
+  vaultRecords        VaultRecord[]
+  backupJobs          BackupJob[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  systemSettings      SystemSetting[]
+  integrationStatuses IntegrationStatus[]
+  loginActivities     LoginActivity[]
+  networkAssessments  NetworkAssessment[]
+  ransomwareStates    RansomwareReadiness[]
+}
+
+model User {
+  id                  String                @id @default(uuid())
+  organizationId      String
+  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email               String                @unique
+  fullName            String
+  passwordHash        String
+  mfaEnabled          Boolean               @default(false)
+  mfaSecretEnc        String?
+  mfaVerifiedAt       DateTime?
+  status              UserStatus            @default(ACTIVE)
+  failedLoginCount    Int                   @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  deletedAt           DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  roles               UserRole[]
+  sessions            UserSession[]
+  passkeys            PasskeyCredential[]
+  passwordResets      PasswordResetToken[]
+  loginActivities     LoginActivity[]
+  devices             Device[]
+  createdAssets       RegisteredAsset[]
+  alerts              SecurityAlert[]       @relation("AlertUser")
+  acknowledgedAlerts  SecurityAlert[]       @relation("AlertAcknowledgedBy")
+  createdIncidents    Incident[]            @relation("IncidentCreator")
+  incidentAssignments IncidentAssignment[]  @relation("IncidentAssignee")
+  assignedIncidents   IncidentAssignment[]  @relation("IncidentAssigner")
+  scanJobs            ScanJob[]
+  leadCases           ForensicCase[]        @relation("CaseLead")
+  createdCases        ForensicCase[]        @relation("CaseCreator")
+  collectedEvidence   EvidenceMetadata[]
+  custodyActions      ChainOfCustody[]
+  vaultRecords        VaultRecord[]
+  vaultActivities     VaultActivity[]
+  vaultRecoveryKit    VaultRecoveryKit?
+  backupJobs          BackupJob[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  networkAssessments  NetworkAssessment[]
+  ransomwareStates    RansomwareReadiness[]
+
+  @@index([organizationId, status])
+  @@index([deletedAt])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  description String
+  isSystem    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  category    String
+  description String
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  id         String   @id @default(uuid())
+  userId     String
+  roleId     String
+  assignedBy String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+}
+
+model PasskeyCredential {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique
+  publicKey    String
+  counter      Int       @default(0)
+  transports   String[]
+  deviceLabel  String
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model UserSession {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String    @unique
+  clientType       String    @default("web")
+  deviceName       String
+  ipAddress        String?
+  userAgent        String?
+  fcmToken         String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastActivityAt   DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model LoginActivity {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  emailAttempted String
+  success        Boolean
+  failureReason  String?
+  mfaUsed        Boolean      @default(false)
+  ipAddress      String?
+  userAgent      String?
+  countryCode    String?
+  city           String?
+  latitude       Float?
+  longitude      Float?
+  isSuspicious   Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([isSuspicious])
+}
+
+model Device {
+  id                      String                @id @default(uuid())
+  organizationId          String
+  organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId                  String
+  user                    User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName              String
+  platform                String
+  manufacturer            String?
+  model                   String?
+  osVersion               String?
+  securityPatchLevel      String?
+  appVersion              String?
+  deviceIdentifier        String
+  isRootedOrCompromised   Boolean               @default(false)
+  screenLockEnabled       Boolean               @default(true)
+  biometricSupported      Boolean               @default(false)
+  encryptionEnabled       Boolean               @default(true)
+  postureScore            Int                   @default(100)
+  complianceStatus        String                @default("COMPLIANT")
+  installedAppCount       Int?
+  highRiskPermissionCount Int?
+  postureDetails          Json?
+  lastSeenAt              DateTime              @default(now())
+  deletedAt               DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  alerts                  SecurityAlert[]
+  networkAssessments      NetworkAssessment[]
+  ransomwareStates        RansomwareReadiness[]
+
+  @@unique([organizationId, deviceIdentifier])
+  @@index([userId])
+  @@index([complianceStatus])
+}
+
+model RegisteredAsset {
+  id                 String               @id @default(uuid())
+  organizationId     String
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById        String
+  createdBy          User                 @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  name               String
+  assetType          String               @default("WEBSITE")
+  targetUrl          String
+  domain             String
+  ownershipStatus    AssetOwnershipStatus @default(PENDING)
+  verificationMethod String?
+  verificationToken  String
+  verifiedAt         DateTime?
+  isApprovedForScan  Boolean              @default(false)
+  notes              String?
+  deletedAt          DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  scanJobs           ScanJob[]
+  alerts             SecurityAlert[]
+
+  @@unique([organizationId, domain])
+  @@index([ownershipStatus, isApprovedForScan])
+}
+
+model SecurityModule {
+  id              String          @id @default(uuid())
+  code            String          @unique
+  slug            String          @unique
+  number          String
+  name            String
+  shortName       String
+  category        String
+  description     String
+  platformSupport String
+  isEnabled       Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  statuses        ModuleStatus[]
+  alerts          SecurityAlert[]
+}
+
+model ModuleStatus {
+  id             String             @id @default(uuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  moduleId       String
+  module         SecurityModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  healthStatus   ModuleHealthStatus @default(HEALTHY)
+  postureScore   Int                @default(100)
+  activeIssues   Int                @default(0)
+  lastCheckedAt  DateTime           @default(now())
+  details        Json?
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([organizationId, moduleId])
+  @@index([healthStatus])
+}
+
+model SecurityAlert {
+  id               String              @id @default(uuid())
+  organizationId   String
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  moduleId         String
+  module           SecurityModule      @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  deviceId         String?
+  device           Device?             @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  assetId          String?
+  asset            RegisteredAsset?    @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  userId           String?
+  user             User?               @relation("AlertUser", fields: [userId], references: [id], onDelete: SetNull)
+  title            String
+  description      String
+  severity         SeverityLevel       @default(MEDIUM)
+  status           AlertStatus         @default(OPEN)
+  category         String
+  sourceRef        String?
+  geoCountry       String?
+  geoCity          String?
+  latitude         Float?
+  longitude        Float?
+  acknowledgedById String?
+  acknowledgedBy   User?               @relation("AlertAcknowledgedBy", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+  resolvedAt       DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  incidentLinks    IncidentAlertLink[]
+
+  @@index([organizationId, status, severity])
+  @@index([moduleId, createdAt])
+}
+
+model Incident {
+  id               String               @id @default(uuid())
+  organizationId   String
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  incidentNumber   String               @unique
+  title            String
+  description      String
+  severity         SeverityLevel        @default(MEDIUM)
+  status           IncidentStatus       @default(OPEN)
+  priority         Int                  @default(3)
+  sourceModuleCode String?
+  createdById      String
+  createdBy        User                 @relation("IncidentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  containedAt      DateTime?
+  resolvedAt       DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  assignments      IncidentAssignment[]
+  alertLinks       IncidentAlertLink[]
+  forensicCases    ForensicCase[]
+
+  @@index([organizationId, status, severity])
+}
+
+model IncidentAssignment {
+  id           String   @id @default(uuid())
+  incidentId   String
+  incident     Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  assigneeId   String
+  assignee     User     @relation("IncidentAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  assignedById String
+  assignedBy   User     @relation("IncidentAssigner", fields: [assignedById], references: [id], onDelete: Restrict)
+  notes        String?
+  assignedAt   DateTime @default(now())
+
+  @@unique([incidentId, assigneeId])
+}
+
+model IncidentAlertLink {
+  incidentId String
+  alertId    String
+  incident   Incident      @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  alert      SecurityAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@id([incidentId, alertId])
+}
+
+model ThreatSource {
+  id             String            @id @default(uuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  providerKey    String
+  feedType       String
+  status         String            @default("ACTIVE")
+  isConfigured   Boolean           @default(false)
+  lastSyncedAt   DateTime?
+  lastError      String?
+  recordCount    Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  indicators     ThreatIndicator[]
+
+  @@unique([organizationId, providerKey])
+}
+
+model ThreatIndicator {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceId       String
+  source         ThreatSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  indicatorType  String
+  value          String
+  threatCategory String
+  severity       SeverityLevel @default(MEDIUM)
+  confidence     Int           @default(70)
+  tags           String[]
+  description    String?
+  firstSeenAt    DateTime      @default(now())
+  lastSeenAt     DateTime      @default(now())
+  expiresAt      DateTime?
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([organizationId, indicatorType, value])
+  @@index([value])
+  @@index([severity, isActive])
+}
+
+model ScanJob {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedById  String
+  requestedBy    User             @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  moduleCode     String
+  targetType     String
+  targetValue    String
+  assetId        String?
+  asset          RegisteredAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  status         ScanStatus       @default(PENDING)
+  providerStatus String           @default("LOCAL_ENGINE")
+  startedAt      DateTime         @default(now())
+  completedAt    DateTime?
+  errorMessage   String?
+  createdAt      DateTime         @default(now())
+
+  result         ScanResult?
+
+  @@index([organizationId, moduleCode, createdAt])
+  @@index([requestedById])
+}
+
+model ScanResult {
+  id                    String   @id @default(uuid())
+  scanJobId             String   @unique
+  scanJob               ScanJob  @relation(fields: [scanJobId], references: [id], onDelete: Cascade)
+  riskLevel             String
+  riskScore             Int
+  summary               String
+  verdictDisclaimer     String
+  findings              Json
+  metadata              Json?
+  falsePositiveReported Boolean  @default(false)
+  falsePositiveReason   String?
+  createdAt             DateTime @default(now())
+}
+
+model ForensicCase {
+  id                 String             @id @default(uuid())
+  organizationId     String
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  caseNumber         String             @unique
+  title              String
+  description        String
+  severity           SeverityLevel      @default(MEDIUM)
+  status             CaseStatus         @default(OPEN)
+  incidentId         String?
+  incident           Incident?          @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+  leadInvestigatorId String?
+  leadInvestigator   User?              @relation("CaseLead", fields: [leadInvestigatorId], references: [id], onDelete: SetNull)
+  createdById        String
+  createdBy          User               @relation("CaseCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  closedAt           DateTime?
+  deletedAt          DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  evidenceItems      EvidenceMetadata[]
+
+  @@index([organizationId, status])
+}
+
+model EvidenceMetadata {
+  id                String           @id @default(uuid())
+  caseId            String
+  forensicCase      ForensicCase     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  label             String
+  evidenceType      String
+  fileName          String
+  byteSize          Int
+  sha256Hash        String
+  collectedById     String
+  collectedBy       User             @relation(fields: [collectedById], references: [id], onDelete: Restrict)
+  collectedAt       DateTime         @default(now())
+  storageLocation   String
+  integrityVerified Boolean          @default(true)
+  notes             String?
+  createdAt         DateTime         @default(now())
+
+  custodyLogs       ChainOfCustody[]
+
+  @@index([caseId])
+  @@index([sha256Hash])
+}
+
+model ChainOfCustody {
+  id                    String           @id @default(uuid())
+  evidenceId            String
+  evidence              EvidenceMetadata @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  actorId               String
+  actor                 User             @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action                String
+  fromCustodian         String?
+  toCustodian           String?
+  purpose               String
+  integrityHashAtAction String
+  ipAddress             String?
+  timestamp             DateTime         @default(now())
+
+  @@index([evidenceId, timestamp])
+}
+
+model VaultRecord {
+  id             String          @id @default(uuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordType     String
+  encryptedTitle String
+  ciphertext     String
+  iv             String
+  authTag        String
+  salt           String
+  kdfAlgorithm   String          @default("PBKDF2-SHA256")
+  kdfIterations  Int             @default(600000)
+  keyVersion     Int             @default(1)
+  deletedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  activities     VaultActivity[]
+
+  @@index([userId, deletedAt])
+}
+
+model VaultActivity {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordId   String?
+  record     VaultRecord? @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  action     String
+  clientType String       @default("web")
+  success    Boolean      @default(true)
+  ipAddress  String?
+  createdAt  DateTime     @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model VaultRecoveryKit {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recoveryCodeHash    String
+  encryptedMasterWrap String
+  iv                  String
+  authTag             String
+  salt                String
+  createdAt           DateTime  @default(now())
+  rotatedAt           DateTime?
+}
+
+model BackupJob {
+  id                String       @id @default(uuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  backupName        String
+  scheduleType      String       @default("MANUAL")
+  status            BackupStatus @default(IN_PROGRESS)
+  encryptionAlgo    String       @default("AES-256-GCM")
+  totalBytes        Int          @default(0)
+  fileCount         Int          @default(0)
+  storageKey        String?
+  integrityVerified Boolean      @default(false)
+  checksumSha256    String?
+  errorMessage      String?
+  startedAt         DateTime     @default(now())
+  completedAt       DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime     @default(now())
+
+  files             BackupFile[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([userId])
+}
+
+model BackupFile {
+  id             String    @id @default(uuid())
+  backupJobId    String
+  backupJob      BackupJob @relation(fields: [backupJobId], references: [id], onDelete: Cascade)
+  relativePath   String
+  originalBytes  Int
+  encryptedBytes Int
+  sha256Hash     String
+  iv             String
+  authTag        String
+  createdAt      DateTime  @default(now())
+
+  @@index([backupJobId])
+}
+
+model Notification {
+  id             String        @id @default(uuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  message        String
+  severity       SeverityLevel @default(INFO)
+  moduleCode     String
+  deepLink       String?
+  resourceType   String?
+  resourceId     String?
+  isRead         Boolean       @default(false)
+  readAt         DateTime?
+  pushDispatched Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+
+  @@index([userId, isRead, createdAt])
+}
+
+model AuditLog {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUserId    String?
+  actorUser      User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorEmail     String?
+  actorRole      String?
+  action         String
+  resourceType   String
+  resourceId     String?
+  moduleCode     String?
+  status         String       @default("SUCCESS")
+  ipAddress      String?
+  userAgent      String?
+  details        Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([moduleCode, action])
+}
+
+model SystemSetting {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key            String
+  value          Json
+  isPublic       Boolean      @default(false)
+  updatedById    String?
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, key])
+}
+
+model IntegrationStatus {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  serviceKey     String
+  displayName    String
+  category       String
+  status         String
+  configured     Boolean      @default(false)
+  details        String?
+  lastCheckedAt  DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, serviceKey])
+}
+
+model NetworkAssessment {
+  id                 String       @id @default(uuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId           String?
+  device             Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  connectionType     String
+  transportLabel     String
+  isVpnActive        Boolean      @default(false)
+  isMetered          Boolean      @default(false)
+  wifiSecurityType   String       @default("UNKNOWN")
+  ssidVisibilityNote String
+  isOpenOrUnsafe     Boolean      @default(false)
+  riskScore          Int          @default(0)
+  checklistState     Json
+  warnings           String[]
+  createdAt          DateTime     @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model RansomwareReadiness {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId       String?
+  device         Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  readinessScore Int          @default(0)
+  backupVerified Boolean      @default(false)
+  checklistState Json
+  canaryStatus   String       @default("UNCONFIGURED")
+  lastDrillAt    DateTime?
+  notes          String?
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([userId, deviceId])
+}

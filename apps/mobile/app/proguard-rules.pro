@@ -1,0 +1,5 @@
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class com.sis.cyberfortress.core.network.** { *; }
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**

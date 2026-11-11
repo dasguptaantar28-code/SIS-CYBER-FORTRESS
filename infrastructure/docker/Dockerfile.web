@@ -1,0 +1,33 @@
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
+ARG NEXT_PUBLIC_WS_URL=http://localhost:4000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+
+COPY package.json ./
+COPY packages/shared-contracts/package.json packages/shared-contracts/
+COPY apps/web/package.json apps/web/
+
+RUN npm install --workspace=@sis/shared-contracts --workspace=@sis/web
+
+COPY packages/shared-contracts packages/shared-contracts
+COPY apps/web apps/web
+
+RUN npm --workspace=@sis/shared-contracts run build
+RUN npm --workspace=@sis/web run build
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next ./apps/web/.next
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/package.json ./apps/web/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+USER nextjs
+EXPOSE 3000
+CMD ["npm", "--workspace=@sis/web", "run", "start"]

@@ -1,0 +1,28 @@
+{
+  "name": "sis-cyber-fortress",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SIS Cyber Fortress — 12-in-1 Enterprise Cybersecurity Ecosystem (NestJS API, Next.js Super Admin & Web Portal, Kotlin/Jetpack Compose Android App)",
+  "workspaces": [
+    "packages/*",
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "build:contracts": "npm --workspace=@sis/shared-contracts run build",
+    "dev:api": "npm --workspace=@sis/api run start:dev",
+    "dev:web": "npm --workspace=@sis/web run dev",
+    "build:api": "npm --workspace=@sis/api run build",
+    "build:web": "npm --workspace=@sis/web run build",
+    "test:api": "npm --workspace=@sis/api test",
+    "test:web": "npm --workspace=@sis/web test",
+    "lint:api": "npm --workspace=@sis/api run lint",
+    "lint:web": "npm --workspace=@sis/web run lint",
+    "prisma:generate": "npm --workspace=@sis/api run prisma:generate",
+    "prisma:migrate": "npm --workspace=@sis/api run prisma:migrate",
+    "prisma:seed": "npm --workspace=@sis/api run prisma:seed"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

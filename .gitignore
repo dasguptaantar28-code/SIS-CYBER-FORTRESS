@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+local.properties
+google-services.json
+firebase-service-account.json
+
+# Build Outputs
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Local Storage & Ephemeral DB
+.pgdata/
+apps/api/storage/backups/
+apps/api/storage/exports/
+
+# Android / Gradle
+apps/mobile/.gradle/
+apps/mobile/build/
+apps/mobile/app/build/
+apps/mobile/.idea/
+apps/mobile/*.iml
+*.apk
+*.aab
+
+# Logs & OS
+logs/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

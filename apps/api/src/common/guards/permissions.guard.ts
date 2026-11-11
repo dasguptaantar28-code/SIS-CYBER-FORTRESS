@@ -1,0 +1,28 @@
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { PermissionCode } from '@sis/shared-contracts';
+import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { AuthenticatedUser } from '../decorators/current-user.decorator';
+
+@Injectable()
+export class PermissionsGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector) {}
+
+  canActivate(context: ExecutionContext): boolean {
+    const requiredPermissions = this.reflector.getAllAndOverride<PermissionCode[]>(
+      PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (!requiredPermissions || requiredPermissions.length === 0) return true;
+
+    const request = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>();
+    const user = request.user;
+    if (!user) throw new ForbiddenException('Access denied.');
+
+    const missing = requiredPermissions.filter((perm) => !user.permissions.includes(perm));
+    if (missing.length > 0) {
+      throw new ForbiddenException(`Missing required permission(s): ${missing.join(', ')}`);
+    }
+    return true;
+  }
+}

@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sis_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sis_dev_password_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-sis_cyber_fortress}
+    ports:
+      - "5432:5432"
+    volumes:
+      - sis_pgdata:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sis_admin} -d ${POSTGRES_DB:-sis_cyber_fortress}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sis-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - sis_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.api
+    container_name: sis-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      API_PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sis_admin}:${POSTGRES_PASSWORD:-sis_dev_password_change_me}@postgres:5432/${POSTGRES_DB:-sis_cyber_fortress}?schema=public
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-replace-access-secret-64-chars-minimum-length-here}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-only-replace-refresh-secret-64-chars-minimum-length-here}
+      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED:-true}
+    ports:
+      - "4000:4000"
+    volumes:
+      - sis_backups:/app/apps/api/storage/backups
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.web
+    container_name: sis-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api/v1}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-http://localhost:4000}
+      API_INTERNAL_URL: http://api:4000/api/v1
+    ports:
+      - "3000:3000"
+
+volumes:
+  sis_pgdata:
+  sis_redisdata:
+  sis_backups:
